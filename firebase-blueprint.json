@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A scheduled legal consultation with Advocate Mahesh Kumar Sharma",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string", "description": "Full name of the client" },
+        "clientEmail": { "type": "string", "description": "Email address of the client" },
+        "clientPhone": { "type": "string", "description": "Phone number of the client" },
+        "date": { "type": "string", "description": "Date of the appointment in YYYY-MM-DD format" },
+        "timeSlot": { "type": "string", "description": "Time slot selected (e.g., 10:00 AM - 10:30 AM)" },
+        "consultationType": { "type": "string", "enum": ["Google Meet", "Zoom", "Phone Consultation", "Offline Office Meeting"] },
+        "caseSummary": { "type": "string", "description": "Brief description of the legal matter" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientName", "clientEmail", "clientPhone", "date", "timeSlot", "consultationType", "status", "createdAt"]
+    },
+    "UserCase": {
+      "title": "UserCase",
+      "description": "An active or historical legal case assigned to a client",
+      "type": "object",
+      "properties": {
+        "caseNo": { "type": "string", "description": "Case registration number (e.g., MKS/2026/8942)" },
+        "clientUid": { "type": "string", "description": "Firebase Auth UID of the associated user" },
+        "clientName": { "type": "string", "description": "Client's name" },
+        "court": { "type": "string", "description": "Name of the court (e.g., Supreme Court of India)" },
+        "matter": { "type": "string", "description": "Type of legal matter" },
+        "status": { "type": "string", "description": "Current legal status" },
+        "nextHearing": { "type": "string", "description": "Next scheduled hearing date in YYYY-MM-DD format" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["caseNo", "clientUid", "clientName", "court", "matter", "status", "nextHearing", "createdAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "A message submitted through the contact page",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the sender" },
+        "email": { "type": "string", "description": "Email address of the sender" },
+        "phone": { "type": "string", "description": "Phone number of the sender" },
+        "subject": { "type": "string", "description": "Subject of the inquiry" },
+        "message": { "type": "string", "description": "Message content" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "List of booked consultations"
+    },
+    "cases/{caseId}": {
+      "schema": "UserCase",
+      "description": "Legal cases displayed in the client portal"
+    },
+    "contacts/{contactId}": {
+      "schema": "ContactMessage",
+      "description": "Inquiries submitted via contact forms"
+    }
+  }
+}

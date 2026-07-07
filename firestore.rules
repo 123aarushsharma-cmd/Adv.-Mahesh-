@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Is current user an admin (Based on email or specific custom claims. We'll allowlist the developer user email)
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "123.aarushsharma@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // ==========================================
+    // APPOINTMENTS COLLECTION
+    // ==========================================
+    match /appointments/{appointmentId} {
+      
+      function isValidAppointment(data) {
+        return data.keys().hasAll(['clientName', 'clientEmail', 'clientPhone', 'date', 'timeSlot', 'consultationType', 'status', 'createdAt'])
+          && data.keys().size() >= 8 && data.keys().size() <= 9
+          && data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 100
+          && data.clientEmail is string && data.clientEmail.size() >= 5 && data.clientEmail.size() <= 100
+          && data.clientPhone is string && data.clientPhone.size() >= 8 && data.clientPhone.size() <= 20
+          && data.date is string && data.date.size() == 10
+          && data.timeSlot is string && data.timeSlot.size() <= 50
+          && data.consultationType in ["Google Meet", "Zoom", "Phone Consultation", "Offline Office Meeting"]
+          && data.status in ["pending", "confirmed", "completed", "cancelled"]
+          && (!data.keys().hasAny(['caseSummary']) || (data.caseSummary is string && data.caseSummary.size() <= 1000))
+          && data.createdAt is string && data.createdAt.size() <= 40;
+      }
+
+      // Read permissions: Admins can read all, clients can read their own by email matching.
+      // Optimized to avoid exists() calls during lists to comply with rule guidelines.
+      allow list: if isSignedIn() && (
+        request.auth.token.email == "123.aarushsharma@gmail.com" || 
+        resource.data.clientEmail == request.auth.token.email
+      );
+
+      allow get: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.clientEmail == request.auth.token.email
+      );
+
+      // Create permissions: Anyone can book (public), but must be valid
+      allow create: if isValidAppointment(incoming()) 
+        && incoming().status == "pending";
+
+      // Update permissions: Admins can update anything.
+      // Clients can only update 'status' to 'cancelled' if it's currently 'pending' or 'confirmed'
+      allow update: if isValidAppointment(incoming()) && (
+        isAdmin() || (
+          isSignedIn() 
+          && existing().clientEmail == request.auth.token.email
+          && incoming().clientEmail == existing().clientEmail
+          && incoming().clientName == existing().clientName
+          && incoming().clientPhone == existing().clientPhone
+          && incoming().date == existing().date
+          && incoming().timeSlot == existing().timeSlot
+          && incoming().consultationType == existing().consultationType
+          && incoming().createdAt == existing().createdAt
+          && incoming().status == "cancelled"
+          && existing().status in ["pending", "confirmed"]
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // CASES COLLECTION
+    // ==========================================
+    match /cases/{caseId} {
+      
+      function isValidCase(data) {
+        return data.keys().hasAll(['caseNo', 'clientUid', 'clientName', 'court', 'matter', 'status', 'nextHearing', 'createdAt'])
+          && data.keys().size() >= 8 && data.keys().size() <= 11
+          && data.caseNo is string && data.caseNo.size() <= 100
+          && data.clientUid is string && data.clientUid.size() <= 128
+          && data.clientName is string && data.clientName.size() <= 200
+          && data.court is string && data.court.size() <= 300
+          && data.matter is string && data.matter.size() <= 500
+          && data.status is string && data.status.size() <= 100
+          && data.nextHearing is string && data.nextHearing.size() <= 30
+          && data.createdAt is string && data.createdAt.size() <= 40
+          && (!data.keys().hasAny(['timeline']) || data.timeline is list)
+          && (!data.keys().hasAny(['documents']) || data.documents is list)
+          && (!data.keys().hasAny(['previousHearings']) || data.previousHearings is list);
+      }
+
+      // Read permissions: Clients can read their own cases, admins can read all
+      // Optimized to avoid exists() calls during lists to comply with rule guidelines.
+      allow list: if isSignedIn() && (
+        request.auth.token.email == "123.aarushsharma@gmail.com" || 
+        resource.data.clientUid == request.auth.uid
+      );
+
+      allow get: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.clientUid == request.auth.uid
+      );
+
+      // Write permissions: Admins and authenticated clients creating their own case
+      allow create: if (isAdmin() || (isSignedIn() && incoming().clientUid == request.auth.uid)) 
+        && isValidCase(incoming());
+
+      // Update permissions: Admins can update anything.
+      // Clients can only update their own case to append documents.
+      allow update: if isValidCase(incoming()) && (
+        isAdmin() || (
+          isSignedIn()
+          && existing().clientUid == request.auth.uid
+          && incoming().clientUid == existing().clientUid
+          && incoming().caseNo == existing().caseNo
+          && incoming().clientName == existing().clientName
+          && incoming().court == existing().court
+          && incoming().matter == existing().matter
+          && incoming().status == existing().status
+          && incoming().nextHearing == existing().nextHearing
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['documents'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // CONTACTS COLLECTION
+    // ==========================================
+    match /contacts/{contactId} {
+      
+      function isValidContact(data) {
+        return data.keys().hasAll(['name', 'email', 'phone', 'subject', 'message', 'createdAt'])
+          && data.keys().size() == 6
+          && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+          && data.email is string && data.email.size() >= 5 && data.email.size() <= 100
+          && data.phone is string && data.phone.size() <= 20
+          && data.subject is string && data.subject.size() <= 150
+          && data.message is string && data.message.size() >= 5 && data.message.size() <= 3000
+          && data.createdAt is string && data.createdAt.size() <= 40;
+      }
+
+      // Read/Update/Delete permissions: Only admins
+      allow list: if isSignedIn() && (
+        request.auth.token.email == "123.aarushsharma@gmail.com"
+      );
+
+      allow get, update, delete: if isAdmin();
+
+      // Create permissions: Publicly available for anyone to send messages
+      allow create: if isValidContact(incoming());
+    }
+  }
+}

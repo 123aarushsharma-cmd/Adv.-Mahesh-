@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Georgia", "Cinzel", ui-serif, serif;
+  --font-sans: "Helvetica Neue", "Arial", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom scrollbar to match the high-end dark premium gold theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* Base custom interactive states */
+html {
+  scroll-behavior: smooth;
+  background-color: #050505;
+}
+
+/* Glass panel background */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Vertical brand styling for editorial look */
+.vertical-brand {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: left center;
+  font-size: 10px;
+  letter-spacing: 5px;
+  color: rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  text-transform: uppercase;
+  z-index: 40;
+  pointer-events: none;
+}
+
